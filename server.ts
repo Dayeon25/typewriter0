@@ -27,6 +27,7 @@ async function startServer() {
     socket.on("join-room", (roomId) => {
       socket.join(roomId);
       console.log(`User ${socket.id} joined room: ${roomId}`);
+      io.to(roomId).emit("user-joined", { userId: socket.id, count: io.sockets.adapter.rooms.get(roomId)?.size });
     });
 
     socket.on("send-key", ({ roomId, key }) => {

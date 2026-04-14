@@ -15,15 +15,15 @@ export default function App() {
   const [isCopied, setIsCopied] = useState(false);
   const [cheonjiin] = useState(() => new CheonjiinState());
   const [connected, setConnected] = useState(false);
+  const [peerConnected, setPeerConnected] = useState(false);
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    const socketUrl = process.env.APP_URL || window.location.origin;
-    console.log('Connecting to socket at:', socketUrl);
-    
-    const s = io(socketUrl, {
+    // Use io() without URL to auto-detect the current host/port
+    const s = io({
       transports: ['websocket', 'polling'],
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
     });
     
     socketRef.current = s;
@@ -43,6 +43,13 @@ export default function App() {
       }
     });
 
+    s.on('user-joined', ({ count }) => {
+      console.log('User joined room, total users:', count);
+      if (count >= 2) {
+        setPeerConnected(true);
+      }
+    });
+
     s.on('connect_error', (err) => {
       console.error('Socket connection error:', err);
     });
@@ -50,6 +57,7 @@ export default function App() {
     s.on('disconnect', (reason) => {
       console.log('Socket disconnected:', reason);
       setConnected(false);
+      setPeerConnected(false);
     });
 
     s.on('receive-key', (key: string) => {
@@ -160,7 +168,7 @@ export default function App() {
                 <h1 className="text-3xl font-serif font-bold mb-2">수신 대기 중</h1>
                 <div className="flex items-center gap-2 text-[#5A5A40]">
                   <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-                  <span className="text-sm font-medium">{connected ? '연결됨' : '연결 끊김'}</span>
+                  <span className="text-sm font-medium">{connected ? (peerConnected ? '상대방 연결됨' : '대기 중...') : '서버 연결 끊김'}</span>
                 </div>
               </div>
               <div className="text-right">
@@ -216,7 +224,7 @@ export default function App() {
         )}
 
         {mode === 'sender' && socketRef.current && (
-          <SenderView roomId={roomId} socket={socketRef.current} cheonjiin={cheonjiin} onBack={() => setMode('select')} />
+          <SenderView roomId={roomId} socket={socketRef.current} cheonjiin={cheonjiin} connected={connected} peerConnected={peerConnected} onBack={() => setMode('select')} />
         )}
 
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white/80 backdrop-blur-md border border-[#5A5A40]/10 px-6 py-3 rounded-full shadow-2xl z-50 flex items-center gap-4">
@@ -234,7 +242,7 @@ export default function App() {
   );
 }
 
-function SenderView({ roomId, socket, cheonjiin, onBack }: { roomId: string, socket: Socket, cheonjiin: CheonjiinState, onBack: () => void }) {
+function SenderView({ roomId, socket, cheonjiin, connected, peerConnected, onBack }: { roomId: string, socket: Socket, cheonjiin: CheonjiinState, connected: boolean, peerConnected: boolean, onBack: () => void }) {
   const [activeTab, setActiveTab] = useState<'keyboard' | 'mouse'>('keyboard');
   const [currentText, setCurrentText] = useState('');
   const [preview, setPreview] = useState('');
@@ -295,6 +303,11 @@ function SenderView({ roomId, socket, cheonjiin, onBack }: { roomId: string, soc
       animate={{ opacity: 1 }}
       className="flex flex-col h-screen bg-white overflow-hidden"
     >
+      {!peerConnected && (
+        <div className="bg-amber-500 text-white text-[10px] font-bold py-1 px-4 text-center animate-pulse">
+          {connected ? '노트북과 연결 대기 중...' : '서버 연결 끊김'}
+        </div>
+      )}
       <div className="p-4 flex justify-between items-center border-b border-[#F5F5F0]">
         <button onClick={onBack} className="text-sm font-medium text-[#5A5A40]">뒤로</button>
         <div className="flex bg-[#F5F5F0] p-1 rounded-xl">
