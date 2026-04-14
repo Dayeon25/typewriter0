@@ -15,20 +15,45 @@ export default function App() {
   const [isCopied, setIsCopied] = useState(false);
   const [cheonjiin] = useState(() => new CheonjiinState());
   const [connected, setConnected] = useState(false);
+  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    socket = io();
-    socket.on('connect', () => setConnected(true));
-    socket.on('disconnect', () => setConnected(false));
+    const socketUrl = process.env.APP_URL || window.location.origin;
+    console.log('Connecting to socket at:', socketUrl);
+    
+    const s = io(socketUrl, {
+      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 5,
+    });
+    
+    socketRef.current = s;
 
-    // Check for room ID in URL
-    const params = new URLSearchParams(window.location.search);
-    const roomFromUrl = params.get('room');
-    if (roomFromUrl) {
-      startSender(roomFromUrl.toUpperCase());
-    }
+    s.on('connect', () => {
+      console.log('Socket connected:', s.id);
+      setConnected(true);
+      
+      // If we have a room from URL, join it now that we're connected
+      const params = new URLSearchParams(window.location.search);
+      const roomFromUrl = params.get('room');
+      if (roomFromUrl) {
+        const id = roomFromUrl.toUpperCase();
+        setRoomId(id);
+        s.emit('join-room', id);
+        setMode('sender');
+      }
+    });
 
-    socket.on('receive-key', (key: string) => {
+    s.on('connect_error', (err) => {
+      console.error('Socket connection error:', err);
+    });
+
+    s.on('disconnect', (reason) => {
+      console.log('Socket disconnected:', reason);
+      setConnected(false);
+    });
+
+    s.on('receive-key', (key: string) => {
+      console.log('Received key:', key);
       if (key === 'backspace') {
         setTypedText(prev => prev.slice(0, -1));
       } else if (key === 'clear') {
@@ -39,21 +64,24 @@ export default function App() {
     });
 
     return () => {
-      socket.off('receive-key');
-      socket.disconnect();
+      s.disconnect();
     };
   }, []);
 
   const startSender = (id: string) => {
     setRoomId(id);
-    socket.emit('join-room', id);
+    if (socketRef.current) {
+      socketRef.current.emit('join-room', id);
+    }
     setMode('sender');
   };
 
   const startReceiver = () => {
     const id = Math.random().toString(36).substring(2, 8).toUpperCase();
     setRoomId(id);
-    socket.emit('join-room', id);
+    if (socketRef.current) {
+      socketRef.current.emit('join-room', id);
+    }
     setMode('receiver');
   };
 
@@ -74,6 +102,11 @@ export default function App() {
             exit={{ opacity: 0, y: -20 }}
             className="flex flex-col items-center justify-center min-h-screen p-6 text-center"
           >
+            {!connected && (
+              <div className="fixed top-4 bg-amber-100 text-amber-800 px-4 py-2 rounded-full text-xs font-bold animate-pulse">
+                서버 연결 중...
+              </div>
+            )}
             <div className="mb-8">
               <div className="w-20 h-20 bg-[#5A5A40] rounded-3xl flex items-center justify-center mb-4 mx-auto shadow-lg">
                 <Keyboard className="text-white w-10 h-10" />
@@ -182,8 +215,8 @@ export default function App() {
           </motion.div>
         )}
 
-        {mode === 'sender' && (
-          <SenderView roomId={roomId} socket={socket} cheonjiin={cheonjiin} onBack={() => setMode('select')} />
+        {mode === 'sender' && socketRef.current && (
+          <SenderView roomId={roomId} socket={socketRef.current} cheonjiin={cheonjiin} onBack={() => setMode('select')} />
         )}
 
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white/80 backdrop-blur-md border border-[#5A5A40]/10 px-6 py-3 rounded-full shadow-2xl z-50 flex items-center gap-4">
