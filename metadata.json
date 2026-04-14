@@ -1,0 +1,6 @@
+{
+  "name": "Remix: Cheonjiin Remote Keyboard",
+  "description": "A remote keyboard app that allows you to type on your computer using a Cheonjiin keyboard layout on your phone via WebSockets.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
