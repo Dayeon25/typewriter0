@@ -14,24 +14,22 @@ async function startServer() {
   const io = new Server(httpServer, {
     cors: {
       origin: "*",
-      methods: ["GET", "POST"],
-      credentials: true
-    },
-    allowEIO3: true,
-    transports: ["websocket"]
+      methods: ["GET", "POST"]
+    }
   });
 
   const PORT = 3000;
 
   // Socket.io logic
   io.on("connection", (socket) => {
-    console.log("A user connected:", socket.id);
+    const transport = socket.conn.transport.name; // 'polling' or 'websocket'
+    console.log(`A user connected: ${socket.id} [Transport: ${transport}]`);
 
     socket.on("join-room", (roomId) => {
-      if (!roomId) return;
       socket.join(roomId);
-      console.log(`User ${socket.id} joined room: ${roomId}`);
-      io.to(roomId).emit("user-joined", { userId: socket.id, count: io.sockets.adapter.rooms.get(roomId)?.size });
+      const roomSize = io.sockets.adapter.rooms.get(roomId)?.size || 0;
+      console.log(`User ${socket.id} joined room: ${roomId}. Total users in room: ${roomSize}`);
+      io.to(roomId).emit("user-joined", { userId: socket.id, count: roomSize });
     });
 
     socket.on("send-key", ({ roomId, key }) => {

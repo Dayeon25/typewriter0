@@ -19,16 +19,15 @@ export default function App() {
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    // In many cloud environments like Cloud Run, websocket transport is more reliable 
-    // when properly configured, and helps avoid CORS/sticky session issues with polling.
-    const socketUrl = import.meta.env.VITE_SOCKET_SERVER_URL || (typeof process !== 'undefined' ? process.env.APP_URL : undefined);
-    
-    console.log('Connecting to socket...', socketUrl ? `at ${socketUrl}` : 'at current origin');
+    // For Vercel deployment, we need to connect to an external Socket.io server
+    // because Vercel Functions do not support persistent WebSocket connections.
+    const socketUrl = import.meta.env.VITE_SOCKET_SERVER_URL || window.location.origin;
+    console.log('Connecting to socket at:', socketUrl);
 
-    const s = io(socketUrl || window.location.origin, {
-      transports: ['websocket'], // Use websocket only to avoid sticky session issues in load-balanced environments
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000,
+    const s = io(socketUrl, {
+      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 20,
+      reconnectionDelay: 2000,
       timeout: 20000,
     });
     
@@ -210,13 +209,19 @@ export default function App() {
 
               <div className="flex flex-col items-center justify-center bg-white rounded-[40px] p-8 shadow-sm h-fit">
                 <p className="text-sm font-medium mb-6 text-center">핸드폰으로 스캔하여<br/>즉시 연결하세요</p>
-                <div className="p-4 bg-[#F5F5F0] rounded-3xl">
+                <div className="p-4 bg-[#F5F5F0] rounded-3xl mb-4">
                   <QRCodeSVG 
-                    value={`${process.env.APP_URL || window.location.origin}?room=${roomId}`} 
+                    value={`${window.location.origin}${window.location.pathname}?room=${roomId}`} 
                     size={180}
                     fgColor="#5A5A40"
                     bgColor="transparent"
                   />
+                </div>
+                <div className="w-full">
+                  <p className="text-[10px] uppercase tracking-widest opacity-40 mb-1 text-center">직접 주소 입력</p>
+                  <p className="text-[10px] font-mono break-all text-center opacity-60 bg-[#F5F5F0] p-2 rounded-lg">
+                    {window.location.origin}{window.location.pathname}?room={roomId}
+                  </p>
                 </div>
                 <button 
                   onClick={() => setMode('select')}
