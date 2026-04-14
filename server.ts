@@ -14,8 +14,11 @@ async function startServer() {
   const io = new Server(httpServer, {
     cors: {
       origin: "*",
-      methods: ["GET", "POST"]
-    }
+      methods: ["GET", "POST"],
+      credentials: true
+    },
+    allowEIO3: true,
+    transports: ["websocket"]
   });
 
   const PORT = 3000;
@@ -25,6 +28,7 @@ async function startServer() {
     console.log("A user connected:", socket.id);
 
     socket.on("join-room", (roomId) => {
+      if (!roomId) return;
       socket.join(roomId);
       console.log(`User ${socket.id} joined room: ${roomId}`);
       io.to(roomId).emit("user-joined", { userId: socket.id, count: io.sockets.adapter.rooms.get(roomId)?.size });

@@ -19,11 +19,17 @@ export default function App() {
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    // Use io() without URL to auto-detect the current host/port
-    const s = io({
-      transports: ['websocket', 'polling'],
+    // In many cloud environments like Cloud Run, websocket transport is more reliable 
+    // when properly configured, and helps avoid CORS/sticky session issues with polling.
+    const socketUrl = import.meta.env.VITE_SOCKET_SERVER_URL || (typeof process !== 'undefined' ? process.env.APP_URL : undefined);
+    
+    console.log('Connecting to socket...', socketUrl ? `at ${socketUrl}` : 'at current origin');
+
+    const s = io(socketUrl || window.location.origin, {
+      transports: ['websocket'], // Use websocket only to avoid sticky session issues in load-balanced environments
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
+      timeout: 20000,
     });
     
     socketRef.current = s;
